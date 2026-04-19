@@ -4,36 +4,51 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
     steps:
+      # 1. Descargamos el código del alumno
       - name: Checkout alumno
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # 2. Instalamos Java 17
       - name: Configurar Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
+      # 3. Compilamos el proyecto (paquetes core y solution)
       - name: Compilar
         run: javac -d out src/core/*.java src/solution/*.java
 
+      # 4. Descargamos los tests privados usando el Token de la Organización
       - name: Descargar Tests Privados
         env:
-          TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+          MY_TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          # Clonamos el repo privado en una carpeta temporal llamada 'secretos'
-          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
-          
+          git clone https://x-access-token:${MY_TOKEN}@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
+
+      # 5. Ejecutamos el Evaluador y capturamos la nota para el Leaderboard
       - name: Ejecutar Evaluador
-              id: evaluador
-              run: |
-                # Guardamos la salida en un archivo y la imprimimos
-                java -cp out core.Main secretos/data/private > resultado.txt
-                cat resultado.txt
-                
-                # Extraemos la nota final para que GitHub la reconozca
-                # Buscamos la línea "PUNTUACIÓN MEDIA FINAL: XX.XX"
-                SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
-                echo "Puntos obtenidos: $SCORE"
-                
-                # Esto le dice a GitHub que esta es la nota oficial del paso
-                echo "score=$SCORE" >> $GITHUB_OUTPUT
+        id: evaluador
+        run: |
+          # Ejecutar y guardar salida en consola y en archivo
+          java -cp out core.Main secretos/data/private | tee resultado.txt
+          
+          # Extraer el número de la línea "PUNTUACIÓN MEDIA FINAL: XX.XX / 100.00"
+          # Este comando busca la línea, se queda con el número y limpia espacios
+          SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
+          
+          # Si no se encuentra la nota, ponemos 0 para evitar errores
+          if [ -z "$SCORE" ]; then SCORE=0; fi
+          
+          echo "Nota detectada para Classroom: $SCORE"
+          
+          # Guardar la nota en el output del step para el Reporter
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+
+      # 6. (Opcional) Este paso intenta enviar la nota formalmente a Classroom
+      - name: Autograding Reporter
+        uses: education/autograding-grading-reporter@v1
+        env:
+          ANY-NAME_RESULTS: "${{ steps.evaluador.outputs.score }}"
+        with:
+          runners: any-name
