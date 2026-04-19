@@ -25,21 +25,20 @@ jobs:
       - name: Ejecutar Evaluador
         id: evaluador
         run: |
-          # Ejecutar y capturar salida
+          # 1. Ejecutar y mostrar tabla en el log
           java -cp out core.Main secretos/data/private | tee resultado.txt
           
-          # Extraer el Score
+          # 2. Extraer la nota (ejemplo: 37.12)
           SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
           if [ -z "$SCORE" ]; then SCORE=0; fi
           
-          echo "Nota para Classroom: $SCORE"
-          # Guardamos el score en el output del step
-          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          # 3. Formatear la salida como JSON que Classroom pueda leer
+          # Esto evita el error del reporter porque generamos el formato exacto
+          echo "::set-output name=result::{\"stats\":{\"tests\":1,\"passes\":1,\"failures\":0,\"pending\":0,\"suites\":1,\"duration\":1},\"tests\":[{\"fullTitle\":\"Evaluacion de Eficiencia\",\"title\":\"Eficiencia\",\"duration\":1,\"err\":{},\"status\":\"passed\",\"speed\":\"fast\",\"score\":$SCORE}]}"
 
       - name: Autograding Reporter
         uses: education/autograding-grading-reporter@v1
         env:
-          # IMPORTANTE: El nombre aquí debe ser EL_NOMBRE_QUE_PONGAS_ABAJO_RESULTS
-          EVALUACION_RESULTS: "${{ steps.evaluador.outputs.score }}"
+          EVALUACION_RESULTS: "${{ steps.evaluador.outputs.result }}"
         with:
           runners: evaluacion
