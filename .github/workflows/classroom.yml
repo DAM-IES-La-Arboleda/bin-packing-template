@@ -23,7 +23,17 @@ jobs:
           # Clonamos el repo privado en una carpeta temporal llamada 'secretos'
           git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
           
-      - name: Ejecutar Evaluador
+- name: Ejecutar Evaluador
+        id: evaluador
         run: |
-          # Ejecutamos el Main pasando la ruta donde están los .txt privados
-          java -cp out core.Main secretos/data/private
+          # Guardamos la salida en un archivo y la imprimimos
+          java -cp out core.Main secretos/data/private > resultado.txt
+          cat resultado.txt
+          
+          # Extraemos la nota final para que GitHub la reconozca
+          # Buscamos la línea "PUNTUACIÓN MEDIA FINAL: XX.XX"
+          SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
+          echo "Puntos obtenidos: $SCORE"
+          
+          # Esto le dice a GitHub que esta es la nota oficial del paso
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
