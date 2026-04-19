@@ -21,7 +21,7 @@ jobs:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
           # Clonamos el repo privado en una carpeta temporal llamada 'secretos'
-          git clone https://x-access-token:$TOKEN@github.com/TU_ORGANIZACION/bin-packing-private-tests.git secretos
+          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
           
       - name: Ejecutar Evaluador
         run: |
