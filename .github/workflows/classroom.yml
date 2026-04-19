@@ -4,13 +4,12 @@ on: [push]
 jobs:
   evaluate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout alumno
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurar Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -30,52 +29,25 @@ jobs:
           output=$(java -cp out core.Main secretos/data/private)
           echo "$output"
 
-          # Extraer score (formato robusto recomendado)
-          score=$(echo "$output" | grep "FINAL_SCORE=" | cut -d '=' -f2)
+          # Extraer score: busca FINAL_SCORE=85.5 y se queda con el 85.5
+          score=$(echo "$output" | grep "FINAL_SCORE=" | cut -d '=' -f2 | xargs)
 
-          # Validación básica
           if [ -z "$score" ]; then
             echo "❌ No se pudo extraer el score"
             exit 1
           fi
+          echo "SCORE=$score" >> $GITHUB_ENV
 
-          score_int=$(printf "%.0f" $score)
-
-          echo "Score final: $score_int"
-
-          echo "SCORE=$score_int" >> $GITHUB_ENV
-
-      - name: Actualizar leaderboard
+      - name: Notificar al Leaderboard Central
+        if: success()
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          alumno=${{ github.actor }}
-
-          echo "Alumno: $alumno"
-          echo "Score: $SCORE"
-
-          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git central
-          cd central
-
-          sudo apt-get update -y
-          sudo apt-get install -y jq
-
-          # Crear leaderboard si no existe
-          if [ ! -f leaderboard.json ]; then
-            echo "{}" > leaderboard.json
-          fi
-
-          # Actualizar score
-          jq --arg alumno "$alumno" --argjson score $SCORE \
-             '.[$alumno] = $score' leaderboard.json > tmp.json && mv tmp.json leaderboard.json
-
-          # Config git
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add leaderboard.json
-          git commit -m "Update $alumno score to $SCORE" || echo "No changes"
-
-          # Evitar conflictos
-          git pull --rebase
-          git push
+          # Enviamos el evento al repo central (el que tiene el index.html)
+          curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/dispatches \
+            -d "{\"event_type\": \"update_leaderboard\", \"client_payload\": {\"user\": \"${{ github.actor }}\", \"score\": \"${{ env.SCORE }}\"}}"
