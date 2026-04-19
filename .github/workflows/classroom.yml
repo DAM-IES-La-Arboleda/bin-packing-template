@@ -4,51 +4,42 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
     steps:
-      # 1. Descargamos el código del alumno
       - name: Checkout alumno
         uses: actions/checkout@v4
 
-      # 2. Instalamos Java 17
       - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. Compilamos el proyecto (paquetes core y solution)
       - name: Compilar
         run: javac -d out src/core/*.java src/solution/*.java
 
-      # 4. Descargamos los tests privados usando el Token de la Organización
       - name: Descargar Tests Privados
         env:
           MY_TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
           git clone https://x-access-token:${MY_TOKEN}@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
 
-      # 5. Ejecutamos el Evaluador y capturamos la nota para el Leaderboard
       - name: Ejecutar Evaluador
         id: evaluador
         run: |
-          # Ejecutar y guardar salida en consola y en archivo
+          # Ejecutar y capturar salida
           java -cp out core.Main secretos/data/private | tee resultado.txt
           
-          # Extraer el número de la línea "PUNTUACIÓN MEDIA FINAL: XX.XX / 100.00"
-          # Este comando busca la línea, se queda con el número y limpia espacios
+          # Extraer el Score
           SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
-          
-          # Si no se encuentra la nota, ponemos 0 para evitar errores
           if [ -z "$SCORE" ]; then SCORE=0; fi
           
-          echo "Nota detectada para Classroom: $SCORE"
-          
-          # Guardar la nota en el output del step para el Reporter
+          echo "Nota para Classroom: $SCORE"
+          # Guardamos el score en el output del step
           echo "score=$SCORE" >> $GITHUB_OUTPUT
 
-      # 6. (Opcional) Este paso intenta enviar la nota formalmente a Classroom
       - name: Autograding Reporter
         uses: education/autograding-grading-reporter@v1
         env:
-          ANY-NAME_RESULTS: "${{ steps.evaluador.outputs.score }}"
+          # IMPORTANTE: El nombre aquí debe ser EL_NOMBRE_QUE_PONGAS_ABAJO_RESULTS
+          EVALUACION_RESULTS: "${{ steps.evaluador.outputs.score }}"
         with:
-          runners: any-name
+          runners: evaluacion
