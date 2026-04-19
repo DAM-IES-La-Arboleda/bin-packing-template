@@ -22,7 +22,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          git clone https://x-access-token:$TOKEN@github.com/TU_ORGANIZACION/bin-packing-private-tests.git secretos
+          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-LaArboleda/bin-packing-private-tests.git secretos
 
       - name: Ejecutar evaluación
         id: run
