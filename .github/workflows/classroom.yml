@@ -2,7 +2,7 @@ name: Autograding
 on: [push]
 
 jobs:
-  run-tests:
+  evaluate:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,23 +18,64 @@ jobs:
       - name: Compilar
         run: javac -d out src/core/*.java src/solution/*.java
 
-      - name: Descargar Tests Privados
+      - name: Descargar tests privados
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
+          git clone https://x-access-token:$TOKEN@github.com/TU_ORGANIZACION/bin-packing-private-tests.git secretos
 
-      - name: Evaluar y generar nota
-        id: grading
+      - name: Ejecutar evaluación
+        id: run
         run: |
           output=$(java -cp out core.Main secretos/data/private)
           echo "$output"
 
-          score=$(echo "$output" | grep "PUNTUACIÓN MEDIA FINAL" | sed -E 's/.*: ([0-9.]+).*/\1/')
+          # Extraer score (formato robusto recomendado)
+          score=$(echo "$output" | grep "FINAL_SCORE=" | cut -d '=' -f2)
 
-          echo "Final score: $score"
+          # Validación básica
+          if [ -z "$score" ]; then
+            echo "❌ No se pudo extraer el score"
+            exit 1
+          fi
 
-          # Convertir a entero (Classroom a veces lo requiere)
           score_int=$(printf "%.0f" $score)
 
+          echo "Score final: $score_int"
+
           echo "SCORE=$score_int" >> $GITHUB_ENV
+
+      - name: Actualizar leaderboard
+        env:
+          TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+        run: |
+          alumno=${{ github.actor }}
+
+          echo "Alumno: $alumno"
+          echo "Score: $SCORE"
+
+          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git central
+          cd central
+
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+          # Crear leaderboard si no existe
+          if [ ! -f leaderboard.json ]; then
+            echo "{}" > leaderboard.json
+          fi
+
+          # Actualizar score
+          jq --arg alumno "$alumno" --argjson score $SCORE \
+             '.[$alumno] = $score' leaderboard.json > tmp.json && mv tmp.json leaderboard.json
+
+          # Config git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add leaderboard.json
+          git commit -m "Update $alumno score to $SCORE" || echo "No changes"
+
+          # Evitar conflictos
+          git pull --rebase
+          git push

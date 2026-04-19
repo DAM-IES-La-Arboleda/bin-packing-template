@@ -1,0 +1,44 @@
+name: Update Leaderboard
+
+on:
+  push:
+    paths:
+      - 'leaderboard.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Instalar jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Generar README
+        run: |
+          echo "# 🏆 Leaderboard Bin Packing" > README.md
+          echo "" >> README.md
+
+          echo "| Posición | Alumno | Puntos |" >> README.md
+          echo "|---------|--------|--------|" >> README.md
+
+          jq -r '
+            to_entries
+            | sort_by(-.value)
+            | to_entries
+            | .[]
+            | "| \(.key + 1) | \(.value.key) | \(.value.value) |"
+          ' leaderboard.json >> README.md
+
+      - name: Commit cambios
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add README.md
+          git commit -m "Update leaderboard" || echo "No changes"
+          git push
