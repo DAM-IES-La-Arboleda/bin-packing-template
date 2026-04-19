@@ -24,21 +24,17 @@ jobs:
         run: |
           git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
 
-      - name: Ejecutar Evaluador
-        id: eval
+      - name: Evaluar y generar nota
+        id: grading
         run: |
           output=$(java -cp out core.Main secretos/data/private)
           echo "$output"
 
-          # Extraer puntuación
           score=$(echo "$output" | grep "PUNTUACIÓN MEDIA FINAL" | sed -E 's/.*: ([0-9.]+).*/\1/')
 
-          echo "Score detectado: $score"
+          echo "Final score: $score"
 
-          # Guardar resultado para GitHub Classroom
-          echo "{\"score\": $score, \"max_score\": 100}" > result.json
+          # Convertir a entero (Classroom a veces lo requiere)
+          score_int=$(printf "%.0f" $score)
 
-      - name: Publicar nota
-        uses: github/classroom-autograding@v1
-        with:
-          grading-file: result.json
+          echo "SCORE=$score_int" >> $GITHUB_ENV

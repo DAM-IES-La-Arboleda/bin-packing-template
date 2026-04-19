@@ -41,6 +41,7 @@ public class Main {
             System.out.println("------------------------------------------------------------");
             System.out.printf("PUNTUACIÓN MEDIA FINAL: %.2f / 100.00%n", (totalScore / count));
             System.out.println("============================================================\n");
+            System.out.println("FINAL_SCORE=" + (totalScore / count));
         }
     }
 
