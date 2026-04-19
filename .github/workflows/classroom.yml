@@ -1,14 +1,16 @@
 name: Autograding
 on: [push]
+
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout alumno
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Configurar Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -18,27 +20,25 @@ jobs:
 
       - name: Descargar Tests Privados
         env:
-          MY_TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+          TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          git clone https://x-access-token:${MY_TOKEN}@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
+          git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
 
       - name: Ejecutar Evaluador
-        id: evaluador
+        id: eval
         run: |
-          # 1. Ejecutar y mostrar tabla en el log
-          java -cp out core.Main secretos/data/private | tee resultado.txt
-          
-          # 2. Extraer la nota (ejemplo: 37.12)
-          SCORE=$(grep "PUNTUACIÓN MEDIA FINAL:" resultado.txt | cut -d':' -f2 | cut -d'/' -f1 | xargs)
-          if [ -z "$SCORE" ]; then SCORE=0; fi
-          
-          # 3. Formatear la salida como JSON que Classroom pueda leer
-          # Esto evita el error del reporter porque generamos el formato exacto
-          echo "::set-output name=result::{\"stats\":{\"tests\":1,\"passes\":1,\"failures\":0,\"pending\":0,\"suites\":1,\"duration\":1},\"tests\":[{\"fullTitle\":\"Evaluacion de Eficiencia\",\"title\":\"Eficiencia\",\"duration\":1,\"err\":{},\"status\":\"passed\",\"speed\":\"fast\",\"score\":$SCORE}]}"
+          output=$(java -cp out core.Main secretos/data/private)
+          echo "$output"
 
-      - name: Autograding Reporter
-        uses: education/autograding-grading-reporter@v1
-        env:
-          EVALUACION_RESULTS: "${{ steps.evaluador.outputs.result }}"
+          # Extraer puntuación
+          score=$(echo "$output" | grep "PUNTUACIÓN MEDIA FINAL" | sed -E 's/.*: ([0-9.]+).*/\1/')
+
+          echo "Score detectado: $score"
+
+          # Guardar resultado para GitHub Classroom
+          echo "{\"score\": $score, \"max_score\": 100}" > result.json
+
+      - name: Publicar nota
+        uses: github/classroom-autograding@v1
         with:
-          runners: evaluacion
+          grading-file: result.json
