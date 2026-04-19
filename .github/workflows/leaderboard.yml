@@ -43,4 +43,4 @@ jobs:
           git commit -m "Update leaderboard from $USER" || echo "No changes"
 
           git pull --rebase
-          git push
+          git push https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git
