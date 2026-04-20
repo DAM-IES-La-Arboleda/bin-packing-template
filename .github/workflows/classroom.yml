@@ -6,49 +6,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Descargar el código entregado por el alumno
       - name: Checkout alumno
         uses: actions/checkout@v4
 
+      # 2. Configurar el entorno de ejecución (Java 17)
       - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
+      # 3. Compilar el proyecto
       - name: Compilar
         run: javac -d out src/core/*.java src/solution/*.java
 
+      # 4. Descargar los tests privados desde el repositorio oculto
       - name: Descargar tests privados
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
           git clone https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-private-tests.git secretos
 
+      # 5. Ejecutar el evaluador y extraer la nota
       - name: Ejecutar evaluación
         id: run
         run: |
+          # Ejecutamos el Main pasando la ruta de los tests privados
           output=$(java -cp out core.Main secretos/data/private)
+          echo "--- SALIDA DEL EVALUADOR ---"
           echo "$output"
+          echo "----------------------------"
 
+          # Extraer el valor numérico tras "FINAL_SCORE="
           score=$(echo "$output" | grep "FINAL_SCORE=" | cut -d '=' -f2 | xargs)
 
           if [ -z "$score" ]; then
-            echo "❌ No se pudo extraer el score"
+            echo "❌ Error: No se pudo extraer la puntuación. Revisa el formato de salida de tu Java."
             exit 1
           fi
 
+          # Guardamos la puntuación en el entorno de la Action
           echo "SCORE=$score" >> $GITHUB_ENV
+          echo "Puntuación obtenida: $score"
 
+      # 6. Enviar la nota al Leaderboard del repositorio de profesor
       - name: Notificar al Leaderboard Central
-              if: success()
-              env:
-                TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
-              run: |
-                # Enviamos el evento al repo de la plantilla
-                curl -L \
-                  -X POST \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer $TOKEN" \
-                  -H "X-GitHub-Api-Version: 2022-11-28" \
-                  https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/dispatches \
-                  -d "{\"event_type\": \"update_leaderboard\", \"client_payload\": {\"user\": \"${{ github.actor }}\", \"score\": \"${{ env.SCORE }}\"}}"
+        if: success()
+        env:
+          TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+        run: |
+          # Realizamos la petición al repositorio que hospeda la web (Plantilla)
+          # Esto activará el workflow 'update-leaderboard.yml' en dicho repo
+          curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/dispatches \
+            -d "{\"event_type\": \"update_leaderboard\", \"client_payload\": {\"user\": \"${{ github.actor }}\", \"score\": \"${{ env.SCORE }}\"}}"
