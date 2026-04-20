@@ -40,7 +40,5 @@ jobs:
           git add leaderboard.json
           git commit -m "Update leaderboard" || echo "No changes"
 
-          git pull --rebase
-
-          # 🔥 FORZAR AUTENTICACIÓN EN PUSH
+          # 🔥 CLAVE: push directo autenticado
           git push https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git HEAD:main
