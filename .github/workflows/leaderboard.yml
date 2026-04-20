@@ -33,12 +33,26 @@ jobs:
       - name: Commit cambios
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+      run: |
+        USER="${{ github.event.client_payload.user }}"
+        SCORE="${{ github.event.client_payload.score }}"
 
-          git add leaderboard.json
-          git commit -m "Update leaderboard" || echo "No changes"
+        echo "Usuario: $USER"
+        echo "Score: $SCORE"
 
-          # 🔥 CLAVE: push directo autenticado
-          git push https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git HEAD:main
+        # Obtener contenido actual
+        content=$(curl -s -H "Authorization: Bearer $TOKEN" \
+          https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json)
+
+        sha=$(echo $content | jq -r '.sha')
+        encoded=$(echo '{"'${USER}'":'${SCORE}'}' | base64 -w 0)
+
+        curl -X PUT \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json \
+          -d "{
+            \"message\": \"update leaderboard\",
+            \"content\": \"$encoded\",
+            \"sha\": \"$sha\"
+          }"
