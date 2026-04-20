@@ -39,60 +39,16 @@ jobs:
 
           echo "SCORE=$score" >> $GITHUB_ENV
 
-      - name: Actualizar leaderboard central
-        if: success()
-        env:
-          TOKEN: ${{ secrets.LEADERBOARD_TOKEN }}
-        run: |
-          USER="${{ github.actor }}"
-          SCORE="${{ env.SCORE }}"
-
-          echo "Usuario: $USER"
-          echo "Score: $SCORE"
-
-          # 🔥 obtener archivo del repo central
-          response=$(curl -s -H "Authorization: Bearer $TOKEN" \
-            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json)
-
-          # 🔥 comprobar si existe contenido
-          exists=$(echo "$response" | jq -r '.content // empty')
-
-          if [ -z "$exists" ]; then
-            echo "{}" > leaderboard.json
-          else
-            echo "$response" | jq -r '.content' | base64 -d > leaderboard.json
-          fi
-
-          # 🔥 actualizar score (solo si es mayor)
-          jq --arg user "$USER" --argjson score "$SCORE" '
-            .[$user] = ([$score, (.[$user] // 0)] | max)
-          ' leaderboard.json > tmp.json
-
-          mv tmp.json leaderboard.json
-
-          # 🔥 preparar contenido base64
-          encoded=$(base64 -w 0 leaderboard.json)
-
-          # 🔥 obtener SHA actual (si existe)
-          sha=$(echo "$response" | jq -r '.sha // empty')
-
-          # 🔥 construir payload
-          if [ -z "$sha" ]; then
-            payload=$(jq -n \
-              --arg msg "update leaderboard from $USER" \
-              --arg content "$encoded" \
-              '{message: $msg, content: $content}')
-          else
-            payload=$(jq -n \
-              --arg msg "update leaderboard from $USER" \
-              --arg content "$encoded" \
-              --arg sha "$sha" \
-              '{message: $msg, content: $content, sha: $sha}')
-          fi
-
-          # 🔥 subir al repo central
-          curl -X PUT \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json \
-            -d "$payload"
+      - name: Notificar al Leaderboard Central
+              if: success()
+              env:
+                TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+              run: |
+                # Enviamos el evento al repo de la plantilla
+                curl -L \
+                  -X POST \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer $TOKEN" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/dispatches \
+                  -d "{\"event_type\": \"update_leaderboard\", \"client_payload\": {\"user\": \"${{ github.actor }}\", \"score\": \"${{ env.SCORE }}\"}}"

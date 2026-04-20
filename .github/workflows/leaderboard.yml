@@ -1,59 +1,34 @@
-name: Update Leaderboard from Dispatch
-
+name: Leaderboard Updater
 on:
   repository_dispatch:
     types: [update_leaderboard]
 
 jobs:
-  update:
+  update-json:
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout Template
+        uses: actions/checkout@v4
 
-      - name: Instalar jq
-        run: sudo apt-get install -y jq
-
-      - name: Actualizar leaderboard
+      - name: Actualizar JSON
         run: |
           USER="${{ github.event.client_payload.user }}"
           SCORE="${{ github.event.client_payload.score }}"
+          
+          echo "Actualizando ranking para $USER con nota $SCORE"
 
-          echo "Usuario: $USER"
-          echo "Score: $SCORE"
+          # Crear el archivo si no existe por algún motivo
+          if [ ! -f leaderboard.json ]; then echo "{}" > leaderboard.json; fi
 
-          if [ ! -f leaderboard.json ]; then
-            echo "{}" > leaderboard.json
-          fi
+          # Actualizar nota: solo guarda la nueva si es mejor que la anterior (High Score)
+          jq --arg u "$USER" --argjson s "$SCORE" \
+          '.[$u] = (if (.[$u] // 0) < $s then $s else .[$u] end)' \
+          leaderboard.json > tmp.json && mv tmp.json leaderboard.json
 
-          jq --arg user "$USER" --argjson score "$SCORE" \
-            '.[$user] = ($score | tonumber)' leaderboard.json > tmp.json && mv tmp.json leaderboard.json
-
-      - name: Commit cambios
-        env:
-          TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
+      - name: Guardar Cambios
         run: |
-          USER="${{ github.event.client_payload.user }}"
-          SCORE="${{ github.event.client_payload.score }}"
-
-          echo "Usuario: $USER"
-          echo "Score: $SCORE"
-
-          # Obtener contenido actual
-          content=$(curl -s -H "Authorization: Bearer $TOKEN" \
-            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json)
-
-          sha=$(echo $content | jq -r '.sha')
-          encoded=$(echo '{"'${USER}'":'${SCORE}'}' | base64 -w 0)
-
-          curl -X PUT \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json \
-            -d "{
-              \"message\": \"update leaderboard\",
-              \"content\": \"$encoded\",
-              \"sha\": \"$sha\"
-            }"
+          git config user.name "Leaderboard Bot"
+          git config user.email "actions@github.com"
+          git add leaderboard.json
+          git commit -m "Score update: ${{ github.event.client_payload.user }}"
+          git push
