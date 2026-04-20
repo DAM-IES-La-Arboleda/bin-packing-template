@@ -37,10 +37,10 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
+          git add leaderboard.json
+          git commit -m "Update leaderboard" || echo "No changes"
+
           git remote set-url origin https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git
 
-          git add leaderboard.json
-          git commit -m "Update leaderboard from $USER" || echo "No changes"
-
           git pull --rebase
-          git push https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git
+          git push
