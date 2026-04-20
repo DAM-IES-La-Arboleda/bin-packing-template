@@ -40,7 +40,7 @@ jobs:
           git add leaderboard.json
           git commit -m "Update leaderboard" || echo "No changes"
 
-          git remote set-url origin https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git
-
           git pull --rebase
-          git push
+
+          # 🔥 FORZAR AUTENTICACIÓN EN PUSH
+          git push https://x-access-token:$TOKEN@github.com/DAM-IES-La-Arboleda/bin-packing-template.git HEAD:main
