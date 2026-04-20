@@ -39,7 +39,6 @@ jobs:
 
           echo "SCORE=$score" >> $GITHUB_ENV
 
-      # 🔥 NUEVO PASO: actualizar leaderboard central
       - name: Actualizar leaderboard central
         if: success()
         env:
@@ -51,27 +50,49 @@ jobs:
           echo "Usuario: $USER"
           echo "Score: $SCORE"
 
-          # Obtener JSON actual
-          content=$(curl -s -H "Authorization: Bearer $TOKEN" \
+          # 🔥 obtener archivo del repo central
+          response=$(curl -s -H "Authorization: Bearer $TOKEN" \
             https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json)
 
-          sha=$(echo "$content" | jq -r '.sha')
+          # 🔥 comprobar si existe contenido
+          exists=$(echo "$response" | jq -r '.content // empty')
 
-          # actualizar leaderboard localmente
-          echo "$content" | jq -r '.content' | base64 -d > leaderboard.json
+          if [ -z "$exists" ]; then
+            echo "{}" > leaderboard.json
+          else
+            echo "$response" | jq -r '.content' | base64 -d > leaderboard.json
+          fi
 
-          jq --arg user "$USER" --argjson score "$SCORE" \
-            '.[$user] = ([$score, (.[$user] // 0)] | max)' leaderboard.json > tmp.json
+          # 🔥 actualizar score (solo si es mayor)
+          jq --arg user "$USER" --argjson score "$SCORE" '
+            .[$user] = ([$score, (.[$user] // 0)] | max)
+          ' leaderboard.json > tmp.json
 
-          encoded=$(base64 -w 0 tmp.json)
+          mv tmp.json leaderboard.json
 
-          # subir al repo central
+          # 🔥 preparar contenido base64
+          encoded=$(base64 -w 0 leaderboard.json)
+
+          # 🔥 obtener SHA actual (si existe)
+          sha=$(echo "$response" | jq -r '.sha // empty')
+
+          # 🔥 construir payload
+          if [ -z "$sha" ]; then
+            payload=$(jq -n \
+              --arg msg "update leaderboard from $USER" \
+              --arg content "$encoded" \
+              '{message: $msg, content: $content}')
+          else
+            payload=$(jq -n \
+              --arg msg "update leaderboard from $USER" \
+              --arg content "$encoded" \
+              --arg sha "$sha" \
+              '{message: $msg, content: $content, sha: $sha}')
+          fi
+
+          # 🔥 subir al repo central
           curl -X PUT \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             https://api.github.com/repos/DAM-IES-La-Arboleda/bin-packing-template/contents/leaderboard.json \
-            -d "{
-              \"message\": \"update leaderboard from $USER\",
-              \"content\": \"$encoded\",
-              \"sha\": \"$sha\"
-            }"
+            -d "$payload"
