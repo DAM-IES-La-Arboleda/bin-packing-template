@@ -55,8 +55,6 @@ jobs:
         env:
           TOKEN: ${{ secrets.MY_PRIVATE_TOKEN }}
         run: |
-          # Usamos las variables de contexto de GitHub (${{ ... }}) 
-          # para asegurar que enviamos el usuario y la nota REAL de ESTA ejecución.
           
           curl -L \
             -X POST \
